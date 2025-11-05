@@ -1,52 +1,85 @@
-import { prisma } from '@/lib/db';
-import { redirect } from 'next/navigation';
+'use client';
 
-export async function MemberForm({ invite }: { invite: any }) {
-  async function submit(formData: FormData) {
-    'use server';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
-    const phone = formData.get('phone') as string;
-    const company = (formData.get('company') as string) || invite.intention.company;
-    const role = formData.get('role') as string;
+export function MemberForm({ invite }: { invite: any }) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-    if (!invite.intentionId) {
-      console.error('ERRO: intentionId ausente:', invite);
-      return { error: 'ID da intenção não encontrado.' };
-    }
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    const formData = new FormData(e.currentTarget);
 
     try {
-      await prisma.member.create({
-        data: {
-          name: invite.intention.name,
-          email: invite.intention.email,
-          phone,
-          company,
-          role,
-          intentionId: invite.intentionId,
-        },
+      const res = await fetch('/api/invite/complete', {
+        method: 'POST',
+        body: formData,
       });
 
-      await prisma.invitation.update({
-        where: { id: invite.id },
-        data: { used: true },
-      });
+      const data = await res.json();
 
-      console.log('Membro criado com sucesso! Redirecionando...');
-      redirect('/invite/success'); // ← Isso já encerra a ação
-    } catch (error: any) {
-      console.error('ERRO NO BANCO:', error.message);
-      // NÃO LANÇAR ERRO AQUI — redirect já trata
-      return { error: 'Falha ao completar cadastro.' };
+      if (!res.ok) throw new Error(data.error || 'Erro ao cadastrar');
+
+      router.push('/invite/success');
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <form action={submit} className="space-y-4">
-      <input name="phone" placeholder="Telefone" required className="w-full p-3 border rounded" />
-      <input name="company" placeholder="Empresa" defaultValue={invite.intention.company || ''} className="w-full p-3 border rounded" />
-      <input name="role" placeholder="Cargo" required className="w-full p-3 border rounded" />
-      <button type="submit" className="w-full bg-blue-600 text-white p-3 rounded font-bold hover:bg-blue-700">
-        Finalizar Cadastro
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <input
+        name="phone"
+        placeholder="Telefone"
+        required
+        disabled={loading}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+      />
+      <input
+        name="company"
+        placeholder="Empresa"
+        defaultValue={invite.intention.company || ''}
+        disabled={loading}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+      />
+      <input
+        name="role"
+        placeholder="Cargo"
+        required
+        disabled={loading}
+        className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+      />
+      <input type="hidden" name="inviteId" value={invite.id} />
+
+      {error && (
+        <p className="text-red-600 text-sm bg-red-50 p-3 rounded-lg border border-red-200">
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full bg-blue-600 text-white p-3 rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+      >
+        {loading ? (
+          <>
+            <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" strokeDasharray="30" />
+              <path fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+            Processando...
+          </>
+        ) : (
+          'Finalizar Cadastro'
+        )}
       </button>
     </form>
   );
