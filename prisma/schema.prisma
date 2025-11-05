@@ -1,0 +1,78 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Intention {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  company   String?
+  reason    String?
+  status    String   @default("pending")
+  createdAt DateTime @default(now())
+
+  invitation Invitation?
+  member     Member?
+}
+
+model Invitation {
+  id          String   @id @default(uuid())
+  intentionId String   @unique
+  token       String   @unique
+  expiresAt   DateTime
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  intention   Intention @relation(fields: [intentionId], references: [id])
+}
+
+model Member {
+  id          String   @id @default(uuid())
+  intentionId String?  @unique  // ADICIONADO @unique
+  name        String
+  email       String   @unique
+  phone       String?
+  company     String?
+  role        String?
+  isActive    Boolean  @default(true)
+  joinedAt    DateTime @default(now())
+
+  intention     Intention? @relation(fields: [intentionId], references: [id])
+  referralsFrom Referral[]  @relation("FromMember")
+  referralsTo   Referral[]  @relation("ToMember")
+  thankYous     ThankYou[]
+}
+
+model Referral {
+  id            String   @id @default(uuid())
+  fromMemberId  String
+  toMemberId    String
+  companyName   String
+  contactName   String?
+  contactInfo   String?
+  description   String?
+  status        String   @default("new")
+  value         Float?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  fromMember    Member   @relation("FromMember", fields: [fromMemberId], references: [id])
+  toMember      Member   @relation("ToMember", fields: [toMemberId], references: [id])
+  thankYous     ThankYou[]
+}
+
+model ThankYou {
+  id         String   @id @default(uuid())
+  referralId String?
+  memberId   String
+  message    String
+  createdAt  DateTime @default(now())
+
+  referral   Referral? @relation(fields: [referralId], references: [id])
+  member     Member    @relation(fields: [memberId], references: [id])
+}
