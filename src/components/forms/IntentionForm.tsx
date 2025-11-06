@@ -1,50 +1,79 @@
 'use client';
-import { useState } from 'react';
+
+import { useState, useRef } from 'react';
 
 export function IntentionForm() {
-  const [success, setSuccess] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
+  const formRef = useRef<HTMLFormElement>(null);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setError('');
-    setSuccess(false);
+    setSubmitted(false);
 
-    const formData = new FormData(e.currentTarget);
-    const data = Object.fromEntries(formData);
+    const form = formRef.current;
+    if (!form) return;
+
+    const formData = new FormData(form);
 
     try {
       const res = await fetch('/api/intentions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
+        body: formData,
       });
 
       if (res.ok) {
-        setSuccess(true);
+        setSubmitted(true);
+        form.reset(); // Agora é 100% seguro
       } else {
-        const err = await res.text();
-        setError('Erro: ' + err);
+        const text = await res.text();
+        setError(text || 'Erro ao enviar. Tente novamente.');
       }
     } catch (err) {
-      setError('Erro de rede');
+      console.error('Erro de rede:', err);
+      setError('Erro de conexão. Verifique sua internet.');
     }
   };
 
-  if (success) {
-    return <p className="text-green-600 font-semibold">Intenção enviada com sucesso!</p>;
-  }
-
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <input name="name" placeholder="Nome" required className="w-full p-2 border rounded" />
-      <input name="email" type="email" placeholder="E-mail" required className="w-full p-2 border rounded" />
-      <input name="company" placeholder="Empresa" className="w-full p-2 border rounded" />
-      <textarea name="reason" placeholder="Por que quer participar?" className="w-full p-2 border rounded" rows={4} />
-      <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700">
-        Enviar Intenção
-      </button>
-      {error && <p className="text-red-600">{error}</p>}
-    </form>
+    <div>
+      {submitted ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '2rem',
+          background: '#e8f5e9',
+          borderRadius: '12px',
+          border: '1px solid #a5d6a7',
+          marginBottom: '1rem',
+        }}>
+          <h2 style={{ color: '#2e7d32', fontSize: '1.5rem', marginBottom: '0.5rem' }}>
+            Enviado com sucesso!
+          </h2>
+          <p style={{ color: '#1b5e20', fontSize: '1.1rem' }}>
+            Sua intenção foi enviada ao administrador.
+          </p>
+        </div>
+      ) : (
+        <form ref={formRef} onSubmit={handleSubmit} style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '1.5rem',
+        }}>
+          <input name="name" placeholder="Nome" required style={{ height: '48px', padding: '0 1rem', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '8px' }} />
+          <input name="email" type="email" placeholder="E-mail" required style={{ height: '48px', padding: '0 1rem', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '8px' }} />
+          <input name="company" placeholder="Empresa" required style={{ height: '48px', padding: '0 1rem', fontSize: '1rem', border: '1px solid #ccc', borderRadius: '8px' }} />
+          <button type="submit" style={{ height: '48px', background: '#0070f3', color: 'white', fontSize: '1rem', fontWeight: 'bold', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+            Enviar Intenção
+          </button>
+        </form>
+      )}
+
+      {error && (
+        <p style={{ color: '#d32f2f', textAlign: 'center', marginTop: '1rem' }}>
+          {error}
+        </p>
+      )}
+    </div>
   );
 }

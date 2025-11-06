@@ -1,95 +1,127 @@
 'use client';
+
 import { useEffect, useState } from 'react';
 
-interface Intention {
-  id: string;
-  name: string;
-  email: string;
-  company?: string;
-  status: string;
-}
-
 export function IntentionList() {
-  const [intentions, setIntentions] = useState<Intention[]>([]);
+  const [intentions, setIntentions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [approving, setApproving] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    fetch('/api/admin/intentions')
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => {
-        setIntentions(data);
+    const fetchIntentions = async () => {
+      try {
+        const res = await fetch('/api/intentions');
+        const text = await res.text(); // Lê como texto primeiro
+
+        if (!res.ok) {
+          throw new Error(text || 'Erro ao carregar intenções');
+        }
+
+        let data;
+        try {
+          data = JSON.parse(text);
+        } catch (parseError) {
+          console.error('Erro ao parsear JSON:', parseError, 'Resposta:', text);
+          throw new Error('Resposta inválida do servidor');
+        }
+
+        setIntentions(Array.isArray(data) ? data : []);
+      } catch (err: any) {
+        console.error('Erro ao carregar intenções:', err);
+        setError(err.message);
+        setIntentions([]);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => setLoading(false));
+      }
+    };
+
+    fetchIntentions();
   }, []);
 
   const approve = async (id: string) => {
-    if (approving || !id) return;
-    setApproving(id);
-
     try {
-      const res = await fetch(`/api/admin/intentions/${id}/approve`, {
+      const res = await fetch(`/api/intentions/${id}/approve`, {
         method: 'POST',
       });
 
-      if (res.ok) {
-        const { link } = await res.json();
-        alert(`Convite gerado!\n\nLink: ${link}\n\nCopie e envie ao candidato.`);
-        setIntentions(prev =>
-          prev.map(i => (i.id === id ? { ...i, status: 'approved' } : i))
-        );
-      } else {
-        const err = await res.text();
-        alert('Erro ao aprovar:\n' + err);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Falha ao aprovar');
       }
-    } catch (err) {
-        alert('Erro de rede. Verifique o console.');
-    } finally {
-      setApproving(null);
+
+      const data = await res.json();
+      alert(`Convite gerado!\n\nLink: ${data.link}\nToken: ${data.token}`);
+      setIntentions(prev => prev.filter((int: any) => int.id !== id));
+    } catch (err: any) {
+      alert(err.message || 'Erro ao aprovar. Tente novamente.');
     }
   };
 
-  if (loading) return <p className="text-gray-600">Carregando intenções...</p>;
+  if (loading) {
+    return <p style={{ textAlign: 'center', color: '#64748b' }}>Carregando...</p>;
+  }
+
+  if (error) {
+    return (
+      <div style={{ textAlign: 'center', color: '#dc2626' }}>
+        <p>Erro: {error}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-4">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       {intentions.length === 0 ? (
-        <p className="text-gray-500 italic">Nenhuma intenção pendente.</p>
+        <div style={{
+          textAlign: 'center',
+          padding: '3rem',
+          color: '#64748b',
+          fontSize: '1.1rem',
+          background: '#f1f5f9',
+          borderRadius: '12px',
+          border: '1px dashed #cbd5e1',
+        }}>
+          Nenhuma intenção pendente no momento.
+        </div>
       ) : (
-        intentions.map(i => (
+        intentions.map((int: any) => (
           <div
-            key={i.id}
-            className="border border-gray-300 p-5 rounded-lg bg-white shadow-sm flex justify-between items-center"
+            key={int.id}
+            style={{
+              border: '1px solid #e2e8f0',
+              borderRadius: '14px',
+              padding: '1.5rem',
+              background: '#ffffff',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.04)',
+            }}
           >
-            <div>
-              <strong className="text-lg">{i.name}</strong>{' '}
-              <span className="text-sm text-gray-600">({i.email})</span>
-              <br />
-              {i.company && (
-                <span className="text-sm text-gray-500 italic">{i.company}</span>
-              )}
+            <div style={{ marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 'bold', color: '#1e293b', margin: '0 0 0.5rem 0' }}>
+                {int.name}
+              </h3>
+              <p style={{ margin: '0.3rem 0', color: '#475569' }}>
+                <strong>E-mail:</strong> {int.email}
+              </p>
+              <p style={{ margin: '0.3rem 0', color: '#475569' }}>
+                <strong>Empresa:</strong> {int.company}
+              </p>
             </div>
-            <div>
-              {i.status === 'pending' ? (
-                <button
-                  onClick={() => approve(i.id)}
-                  disabled={approving === i.id}
-                  type="button"
-                  className={`
-                    px-5 py-2 rounded font-medium text-white transition-all
-                    ${approving === i.id
-                      ? 'bg-gray-400 cursor-not-allowed'
-                      : 'bg-green-600 hover:bg-green-700 active:bg-green-800 shadow-md'
-                    }
-                  `}
-                >
-                  {approving === i.id ? 'Aprovando...' : 'Aprovar'}
-                </button>
-              ) : (
-                <span className="text-green-600 font-semibold">Aprovado</span>
-              )}
-            </div>
+            <button
+              onClick={() => approve(int.id)}
+              style={{
+                width: '100%',
+                height: '52px',
+                background: '#10b981',
+                color: 'white',
+                fontSize: '1.1rem',
+                fontWeight: 'bold',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+              }}
+            >
+              Aprovar e Gerar Convite
+            </button>
           </div>
         ))
       )}

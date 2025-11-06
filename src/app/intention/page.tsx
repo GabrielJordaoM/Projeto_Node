@@ -2,9 +2,22 @@ import { IntentionForm } from '@/components/forms/IntentionForm';
 
 export default function IntentionPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-6">
-      <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-2xl">
-        <h1 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: '2rem',
+      background: '#f7f9fc',
+      fontFamily: 'Arial, sans-serif',
+    }}>
+      <div style={{ width: '100%', maxWidth: '500px' }}>
+        <h1 style={{
+          fontSize: '2rem',
+          marginBottom: '2rem',
+          color: '#1a1a1a',
+          textAlign: 'center',
+        }}>
           Formulário de Intenção
         </h1>
         <IntentionForm />
