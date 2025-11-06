@@ -40,8 +40,11 @@ export function IntentionList() {
 
   const approve = async (id: string) => {
     try {
-      const res = await fetch(`/api/intentions/${id}/approve`, {
+      const res = await fetch(`/api/admin/intentions/${id}/approve`, {
         method: 'POST',
+        headers: {
+          'X-Admin-Key': process.env.NEXT_PUBLIC_ADMIN_KEY || '',
+        },
       });
 
       if (!res.ok) {

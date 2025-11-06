@@ -9,7 +9,11 @@ export async function POST(
 ) {
   // 1. Obtém a chave do cabeçalho da requisição (o frontend deve enviá-la)
   const clientKey = request.headers.get('X-Admin-Key');
-  const serverKey = process.env.ADMIN_KEY;
+  // aceita ADMIN_KEY ou (em demo) NEXT_PUBLIC_ADMIN_KEY
+  const serverKey = process.env.ADMIN_KEY || process.env.NEXT_PUBLIC_ADMIN_KEY;
+
+  // Debug leve para desenvolvimento (não imprime chaves)
+  console.log('[ADMIN APPROVE] clientKey present:', !!clientKey, 'serverKey present:', !!serverKey, 'match:', clientKey === serverKey);
 
   // 2. Verifica a autorização:
   // (a) Se não há chave no cliente, (b) se a chave do cliente não bate com a chave do servidor, 
@@ -19,15 +23,28 @@ export async function POST(
   }
 
   const { id } = params; // Usando a sintaxe comum, já que 'params' não é Promise aqui
+  // Alguns ambientes podem não popular `params` corretamente — tenta extrair do pathname como fallback
+  let intentionId = id;
+  if (!intentionId) {
+    try {
+      const pathname = request.nextUrl?.pathname || new URL(request.url).pathname;
+      const m = pathname.match(/\/api\/admin\/intentions\/(.*?)\/approve/);
+      if (m) intentionId = m[1];
+    } catch (e) {
+      // ignore
+    }
+  }
 
-  if (!id) {
+  console.log('[ADMIN APPROVE] request url:', request.url, 'params.id:', id, 'resolved id:', intentionId);
+
+  if (!intentionId) {
     return NextResponse.json({ error: 'ID da intenção não fornecido' }, { status: 400 });
   }
 
   try {
     // Verifica se intenção existe e não foi aprovada
     const intention = await prisma.intention.findUnique({
-      where: { id },
+      where: { id: intentionId },
       include: { invitation: true },
     });
 
@@ -47,29 +64,33 @@ export async function POST(
     const invitation = await prisma.invitation.create({
       data: {
         token,
-        intentionId: id,
+        intentionId: intentionId,
         expiresAt,
       },
     });
 
-    // Atualiza intenção com invitationId
+    // Marca intenção como aprovada (atualiza status)
     await prisma.intention.update({
-      where: { id },
-      data: { invitationId: invitation.id },
+      where: { id: intentionId },
+      data: { status: 'approved' },
     });
 
-    // Gera link completo
-    const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
-    const inviteLink = `${baseUrl}/register/${token}`;
+  // Gera link completo (rota existente em /invite/[token])
+  const baseUrl = process.env.NEXT_PUBLIC_URL || 'http://localhost:3000';
+  const inviteLink = `${baseUrl}/invite/${token}`;
     
     // Simulação do envio de e-mail (conforme pedido no teste)
     console.log(`[SIMULAÇÃO E-MAIL] Convite gerado para ${intention.email}: ${inviteLink}`);
 
 
-    // Retorna sucesso e o link gerado (opcionalmente)
+    // Retorna sucesso e o link gerado (mantemos formas compatíveis com a UI antiga)
     return NextResponse.json({ 
       message: 'Intenção aprovada e convite gerado.', 
-      inviteLink: inviteLink 
+      inviteLink: inviteLink,
+      // campos anteriores esperados pelo cliente
+      link: inviteLink,
+      token: token,
+      invitationId: invitation.id,
     }, { status: 200 });
 
   } catch (error) {
